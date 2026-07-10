@@ -10,7 +10,7 @@ import { buildAnnouncementInput } from "@/lib/telegram/announce-input";
  * message is too old to edit, posts a fresh status message and stores its id.
  * Best-effort: silently returns when the bot isn't fully configured.
  */
-export async function refreshAnnouncement(periodId: string): Promise<void> {
+export async function refreshAnnouncement(periodId: string, banner?: string): Promise<void> {
   const token = await getBotTokenService();
   if (!token) return;
 
@@ -59,6 +59,7 @@ export async function refreshAnnouncement(periodId: string): Promise<void> {
       })),
       activeMembers: active.map((m) => ({ id: m.id, name: m.name, is_admin: m.is_admin })),
       paidMemberIds,
+      banner,
     });
   } catch {
     return; // e.g. >1 admin — nothing sensible to render

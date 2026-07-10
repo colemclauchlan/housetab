@@ -14,6 +14,7 @@ import {
   deleteMember,
   markSharePaid,
   postLinkingMessage,
+  reannounce,
   removeBillType,
   renameMember,
   renamePeriod,
@@ -81,6 +82,12 @@ export default async function Home({
   const paidCount = preview
     ? preview.shares.filter((s) => shares.get(s.memberId)?.status === "paid").length
     : 0;
+
+  // After announcing, have the bills changed the frozen per-person amounts? (FR-9)
+  const announcedAmountsChanged =
+    current?.period.status === "announced" &&
+    preview != null &&
+    preview.shares.some((s) => shares.get(s.memberId)?.amount_cents !== s.amountCents);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 p-6">
@@ -281,14 +288,28 @@ export default async function Home({
               📣 Announce to the group
             </button>
           </form>
-        ) : current ? (
-          <p className="pt-1 text-xs opacity-60">
-            Announced
-            {current.period.announce_message_id
-              ? ` · message #${current.period.announce_message_id}`
-              : ""}
-            . Edit a bill to re-announce (M3.3).
-          </p>
+        ) : current && current.period.status === "announced" ? (
+          <div className="flex flex-col gap-2 pt-1">
+            {announcedAmountsChanged ? (
+              <p className="rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                ⚠️ Bills changed since announcing — re-announce to update the group (paid checks
+                reset if the amount changed).
+              </p>
+            ) : (
+              <p className="text-xs opacity-60">
+                Announced
+                {current.period.announce_message_id
+                  ? ` · message #${current.period.announce_message_id}`
+                  : ""}
+                .
+              </p>
+            )}
+            <form action={reannounce}>
+              <button type="submit" className={announcedAmountsChanged ? primaryBtn : secondaryBtn}>
+                ♻️ Re-announce
+              </button>
+            </form>
+          </div>
         ) : null}
       </section>
 

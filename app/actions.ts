@@ -21,9 +21,9 @@ import { buildAnnouncement } from "@/lib/telegram/announce";
 import { refreshAnnouncement } from "@/lib/telegram/refresh";
 
 /** Best-effort: reflect a status change in the group chat; never block the admin. */
-async function refreshChat(periodId: string): Promise<void> {
+async function refreshChat(periodId: string, banner?: string): Promise<void> {
   try {
-    await refreshAnnouncement(periodId);
+    await refreshAnnouncement(periodId, banner);
   } catch {
     // ignore — the dashboard is the source of truth; the chat is a mirror
   }
@@ -330,6 +330,67 @@ export async function announce() {
 
   revalidatePath("/");
   redirect(`/?ok=${encodeURIComponent("Announced to the group.")}`);
+}
+
+export async function reannounce() {
+  const cfg = await getBotConfig();
+  if (!cfg.token) backWithError("Set the bot token in Settings first.");
+  if (cfg.groupChatId == null || !cfg.groupConfirmed) {
+    backWithError("Confirm the house group in Settings first.");
+  }
+
+  const current = await getCurrentPeriod();
+  if (!current) backWithError("No period to re-announce.");
+  if (current.period.status !== "announced") {
+    backWithError("Announce first before re-announcing.");
+  }
+
+  const members = (await getMembers()).filter((m) => m.active);
+  if (members.length === 0) backWithError("Add members first.");
+
+  let preview: ReturnType<typeof splitEven>;
+  try {
+    preview = splitEven(
+      current.totalCents,
+      members.map((m) => ({ id: m.id, isAdmin: m.is_admin, active: true })),
+    );
+  } catch (e) {
+    backWithError(e instanceof Error ? e.message : "Cannot compute the split.");
+  }
+  const amountByMember = new Map(preview.shares.map((s) => [s.memberId, s.amountCents]));
+
+  // Per-person amount changed vs the frozen shares?
+  const frozen = await getPeriodShares(current.period.id);
+  const amountsChanged = members.some(
+    (m) => frozen.get(m.id)?.amount_cents !== amountByMember.get(m.id),
+  );
+
+  const supabase = await createClient();
+  const rows = members.map((m) => ({
+    period_id: current.period.id,
+    member_id: m.id,
+    amount_cents: amountByMember.get(m.id) ?? 0,
+    // If the amount changed, reset paid checks (FR-9); otherwise leave them.
+    ...(amountsChanged ? { status: "pending" as const, paid_at: null, paid_via: null } : {}),
+  }));
+  const { error } = await supabase
+    .from("shares")
+    .upsert(rows, { onConflict: "period_id,member_id" });
+  if (error) backWithError(error.message);
+
+  const banner = amountsChanged
+    ? "♻️ Updated breakdown — the amount changed, so paid checks were reset."
+    : "♻️ Updated breakdown";
+  await refreshChat(current.period.id, banner);
+
+  revalidatePath("/");
+  redirect(
+    `/?ok=${encodeURIComponent(
+      amountsChanged
+        ? "Re-announced — amounts changed, paid checks reset."
+        : "Re-announced to the group.",
+    )}`,
+  );
 }
 
 export async function postLinkingMessage() {
