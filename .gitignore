@@ -1,0 +1,26 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# builds
+.next/
+out/
+dist/
+.vercel/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# WhatsApp session data (never commit)
+auth_info*/
+*.session
+baileys_store*
+
+# misc
+.DS_Store
+Thumbs.db
+*.log
+coverage/
+.turbo/
