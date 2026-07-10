@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatCents } from "@/lib/money";
 import { splitEven } from "@/lib/split";
-import { getCurrentPeriod, getMembers, getSettings } from "@/lib/data/dashboard";
+import type { Database } from "@/lib/database.types";
+import { getCurrentPeriod, getMembers, getPeriodShares, getSettings } from "@/lib/data/dashboard";
 import { logout } from "./login/actions";
 import {
   addBill,
@@ -9,14 +10,26 @@ import {
   addMember,
   deleteBill,
   deleteMember,
+  markSharePaid,
   removeBillType,
   renameMember,
   renamePeriod,
   setMemberActive,
   setMemberAdmin,
   unlinkMember,
+  unmarkShare,
   updateBill,
 } from "./actions";
+
+type Share = Database["public"]["Tables"]["shares"]["Row"];
+
+const torontoDateTime = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Toronto",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
 
 const inputCls =
   "rounded border border-black/15 bg-transparent px-2 py-1 text-sm dark:border-white/20";
@@ -44,6 +57,7 @@ export default async function Home({
   ]);
   const typeOptions = [...billTypes, "Other"];
   const activeMembers = members.filter((m) => m.active);
+  const memberById = new Map(members.map((m) => [m.id, m]));
 
   // Live per-person preview of the current period's even split (frozen at Announce, M2.4).
   let preview: ReturnType<typeof splitEven> | null = null;
@@ -58,6 +72,12 @@ export default async function Home({
       previewError = e instanceof Error ? e.message : "cannot compute split";
     }
   }
+
+  // Paid/unpaid status per member for the current period.
+  const shares: Map<string, Share> = current ? await getPeriodShares(current.period.id) : new Map();
+  const paidCount = preview
+    ? preview.shares.filter((s) => shares.get(s.memberId)?.status === "paid").length
+    : 0;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 p-6">
@@ -197,6 +217,46 @@ export default async function Home({
         ) : null}
         {current && previewError ? (
           <p className="text-xs text-red-600 dark:text-red-400">Can’t split: {previewError}</p>
+        ) : null}
+
+        {current && preview ? (
+          <div className="flex flex-col gap-1">
+            <h3 className="text-sm font-medium opacity-80">
+              Paid checklist · {paidCount}/{preview.activeCount} paid
+            </h3>
+            <ul className="flex flex-col divide-y divide-black/5 dark:divide-white/5">
+              {preview.shares.map((s) => {
+                const member = memberById.get(s.memberId);
+                const share = shares.get(s.memberId);
+                const paid = share?.status === "paid";
+                return (
+                  <li
+                    key={s.memberId}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm"
+                  >
+                    <span className="min-w-24">
+                      {paid ? "✅" : "⬜"} {member?.name ?? "—"}
+                      {s.isAdmin ? <span className="opacity-50"> (admin)</span> : null}
+                    </span>
+                    <span className="font-mono">{formatCents(s.amountCents)}</span>
+                    <span className="text-xs opacity-50">
+                      {paid && share?.paid_at
+                        ? `${torontoDateTime.format(new Date(share.paid_at))} · ${share.paid_via}`
+                        : ""}
+                    </span>
+                    <form action={paid ? unmarkShare : markSharePaid} className="ml-auto">
+                      <input type="hidden" name="periodId" value={current.period.id} />
+                      <input type="hidden" name="memberId" value={s.memberId} />
+                      <input type="hidden" name="amountCents" value={s.amountCents} />
+                      <button type="submit" className={secondaryBtn}>
+                        {paid ? "Unmark" : "Mark paid"}
+                      </button>
+                    </form>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         ) : null}
       </section>
 

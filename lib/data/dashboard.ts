@@ -5,6 +5,14 @@ import type { Database } from "@/lib/database.types";
 type Bill = Database["public"]["Tables"]["bills"]["Row"];
 type Period = Database["public"]["Tables"]["periods"]["Row"];
 type Member = Database["public"]["Tables"]["members"]["Row"];
+type Share = Database["public"]["Tables"]["shares"]["Row"];
+
+/** Paid/unpaid share rows for a period, keyed by member id. */
+export async function getPeriodShares(periodId: string): Promise<Map<string, Share>> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("shares").select("*").eq("period_id", periodId);
+  return new Map((data ?? []).map((s) => [s.member_id, s]));
+}
 
 /** All members, admin first then by creation order. */
 export async function getMembers(): Promise<Member[]> {

@@ -105,6 +105,49 @@ export async function renamePeriod(formData: FormData) {
   redirect("/");
 }
 
+// ─── Paid checklist (shares) ─────────────────────────────────────────────────
+
+export async function markSharePaid(formData: FormData) {
+  const periodId = String(formData.get("periodId") ?? "");
+  const memberId = String(formData.get("memberId") ?? "");
+  const amountCents = Number(formData.get("amountCents") ?? "0");
+  if (!periodId || !memberId) backWithError("Missing share info.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("shares").upsert(
+    {
+      period_id: periodId,
+      member_id: memberId,
+      amount_cents: Number.isFinite(amountCents) ? amountCents : 0,
+      status: "paid",
+      paid_at: new Date().toISOString(),
+      paid_via: "admin",
+    },
+    { onConflict: "period_id,member_id" },
+  );
+  if (error) backWithError(error.message);
+
+  revalidatePath("/");
+  redirect("/");
+}
+
+export async function unmarkShare(formData: FormData) {
+  const periodId = String(formData.get("periodId") ?? "");
+  const memberId = String(formData.get("memberId") ?? "");
+  if (!periodId || !memberId) backWithError("Missing share info.");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("shares")
+    .update({ status: "pending", paid_at: null, paid_via: null })
+    .eq("period_id", periodId)
+    .eq("member_id", memberId);
+  if (error) backWithError(error.message);
+
+  revalidatePath("/");
+  redirect("/");
+}
+
 // ─── Members ─────────────────────────────────────────────────────────────────
 
 export async function addMember(formData: FormData) {
