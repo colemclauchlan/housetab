@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { getBotTokenService } from "@/lib/telegram/token";
 import { answerCallbackQuery } from "@/lib/telegram/api";
+import { refreshAnnouncement } from "@/lib/telegram/refresh";
 import type { PaidDeps } from "@/lib/telegram/paid";
 
 /** Production PaidDeps backed by the Supabase service client + Bot API. */
@@ -56,6 +57,9 @@ export function createServicePaidDeps(): PaidDeps {
       }
     },
 
-    // onPaid (live announcement grid refresh) is wired in M3.2.
+    async onPaid(periodId) {
+      // Live grid refresh (FR-11) — best-effort; never fail the webhook over it.
+      await refreshAnnouncement(periodId);
+    },
   };
 }

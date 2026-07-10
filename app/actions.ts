@@ -18,6 +18,16 @@ import { splitEven } from "@/lib/split";
 import { sendMessage } from "@/lib/telegram/api";
 import { buildLinkingMessage } from "@/lib/telegram/linking";
 import { buildAnnouncement } from "@/lib/telegram/announce";
+import { refreshAnnouncement } from "@/lib/telegram/refresh";
+
+/** Best-effort: reflect a status change in the group chat; never block the admin. */
+async function refreshChat(periodId: string): Promise<void> {
+  try {
+    await refreshAnnouncement(periodId);
+  } catch {
+    // ignore — the dashboard is the source of truth; the chat is a mirror
+  }
+}
 
 function backWithError(message: string): never {
   redirect(`/?error=${encodeURIComponent(message)}`);
@@ -135,6 +145,7 @@ export async function markSharePaid(formData: FormData) {
   );
   if (error) backWithError(error.message);
 
+  await refreshChat(periodId);
   revalidatePath("/");
   redirect("/");
 }
@@ -152,6 +163,7 @@ export async function unmarkShare(formData: FormData) {
     .eq("member_id", memberId);
   if (error) backWithError(error.message);
 
+  await refreshChat(periodId);
   revalidatePath("/");
   redirect("/");
 }
