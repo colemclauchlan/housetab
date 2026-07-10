@@ -9,7 +9,8 @@ owes.
 
 ## Status
 
-📋 **Planning** — PRD drafted, awaiting sign-off. No production code yet.
+✅ **PRD approved** (even 6-way split; per-person extras deferred) — ready for the build agent
+to start on the execution plan. No production code yet.
 
 - [PRD](docs/PRD.md) — what we're building and why
 - [Execution plan](docs/EXECUTION_PLAN.md) — task-by-task build plan for the autonomous agent
