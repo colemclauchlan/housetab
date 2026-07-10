@@ -7,13 +7,17 @@ import { parseDollarsToCents } from "@/lib/money";
 import {
   ensureCurrentPeriod,
   getBillWithPeriod,
+  getCurrentPeriod,
   getMembers,
+  getPeriodShares,
   getSettings,
   setBillTypes,
 } from "@/lib/data/dashboard";
 import { getBotConfig } from "@/lib/data/bot";
+import { splitEven } from "@/lib/split";
 import { sendMessage } from "@/lib/telegram/api";
 import { buildLinkingMessage } from "@/lib/telegram/linking";
+import { buildAnnouncement } from "@/lib/telegram/announce";
 
 function backWithError(message: string): never {
   redirect(`/?error=${encodeURIComponent(message)}`);
@@ -237,6 +241,83 @@ export async function deleteMember(formData: FormData) {
 
   revalidatePath("/");
   redirect("/");
+}
+
+export async function announce() {
+  const cfg = await getBotConfig();
+  if (!cfg.token) backWithError("Set the bot token in Settings first.");
+  if (cfg.groupChatId == null || !cfg.groupConfirmed) {
+    backWithError("Confirm the house group in Settings first.");
+  }
+
+  const current = await getCurrentPeriod();
+  if (!current) backWithError("No open period to announce.");
+  if (current.period.status !== "open") {
+    backWithError("Already announced. Edit a bill to re-announce (coming in M3.3).");
+  }
+
+  const members = (await getMembers()).filter((m) => m.active);
+  if (members.length === 0) backWithError("Add members before announcing.");
+
+  let preview: ReturnType<typeof splitEven>;
+  try {
+    preview = splitEven(
+      current.totalCents,
+      members.map((m) => ({ id: m.id, isAdmin: m.is_admin, active: true })),
+    );
+  } catch (e) {
+    backWithError(e instanceof Error ? e.message : "Cannot compute the split.");
+  }
+  const amountByMember = new Map(preview.shares.map((s) => [s.memberId, s.amountCents]));
+
+  const supabase = await createClient();
+  // Freeze shares — set each active member's amount (a new row defaults to pending;
+  // an existing row keeps its paid status).
+  const { error: freezeError } = await supabase.from("shares").upsert(
+    members.map((m) => ({
+      period_id: current.period.id,
+      member_id: m.id,
+      amount_cents: amountByMember.get(m.id) ?? 0,
+    })),
+    { onConflict: "period_id,member_id" },
+  );
+  if (freezeError) backWithError(freezeError.message);
+
+  const shares = await getPeriodShares(current.period.id);
+  const message = buildAnnouncement({
+    periodLabel: current.period.label,
+    bills: current.bills.map((b) => ({
+      type: b.type,
+      label: b.label,
+      amountCents: b.amount_cents,
+    })),
+    totalCents: current.totalCents,
+    perPersonCents: preview.perPersonCents,
+    activeCount: preview.activeCount,
+    members: members.map((m) => ({
+      name: m.name,
+      amountCents: amountByMember.get(m.id) ?? 0,
+      isAdmin: m.is_admin,
+      paid: shares.get(m.id)?.status === "paid",
+    })),
+  });
+
+  let sent;
+  try {
+    sent = await sendMessage(cfg.token, cfg.groupChatId, message.text, {
+      reply_markup: message.reply_markup,
+    });
+  } catch (e) {
+    backWithError(e instanceof Error ? e.message : "Failed to send the announcement.");
+  }
+
+  await supabase
+    .from("periods")
+    .update({ status: "announced", announce_message_id: sent.message_id })
+    .eq("id", current.period.id);
+
+  revalidatePath("/");
+  redirect(`/?ok=${encodeURIComponent("Announced to the group.")}`);
 }
 
 export async function postLinkingMessage() {

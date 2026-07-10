@@ -9,6 +9,7 @@ import {
   addBill,
   addBillType,
   addMember,
+  announce,
   deleteBill,
   deleteMember,
   markSharePaid,
@@ -272,6 +273,22 @@ export default async function Home({
               })}
             </ul>
           </div>
+        ) : null}
+
+        {current && current.period.status === "open" ? (
+          <form action={announce} className="pt-1">
+            <button type="submit" className={primaryBtn}>
+              📣 Announce to the group
+            </button>
+          </form>
+        ) : current ? (
+          <p className="pt-1 text-xs opacity-60">
+            Announced
+            {current.period.announce_message_id
+              ? ` · message #${current.period.announce_message_id}`
+              : ""}
+            . Edit a bill to re-announce (M3.3).
+          </p>
         ) : null}
       </section>
 
