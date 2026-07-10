@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatCents } from "@/lib/money";
 import { splitEven } from "@/lib/split";
@@ -86,11 +87,19 @@ export default async function Home({
           <h1 className="text-2xl font-semibold">HouseTab</h1>
           <p className="text-xs opacity-60">Signed in as {user?.email}</p>
         </div>
-        <form action={logout}>
-          <button className="text-sm underline underline-offset-4 opacity-70 hover:opacity-100">
-            Sign out
-          </button>
-        </form>
+        <div className="flex items-center gap-4">
+          <Link
+            href="/settings"
+            className="text-sm underline underline-offset-4 opacity-70 hover:opacity-100"
+          >
+            Settings
+          </Link>
+          <form action={logout}>
+            <button className="text-sm underline underline-offset-4 opacity-70 hover:opacity-100">
+              Sign out
+            </button>
+          </form>
+        </div>
       </header>
 
       {error ? (
