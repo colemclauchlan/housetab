@@ -78,7 +78,10 @@ describe("splitEven — active/inactive divisor", () => {
   });
 
   it("inactive members are excluded entirely (down to /3)", () => {
-    const r = splitEven(1000, house({ 3: { active: false }, 4: { active: false }, 5: { active: false } }));
+    const r = splitEven(
+      1000,
+      house({ 3: { active: false }, 4: { active: false }, 5: { active: false } }),
+    );
     expect(r.activeCount).toBe(3);
     expect(r.perPersonCents).toBe(333);
     expect(r.remainderCents).toBe(1);
@@ -87,7 +90,16 @@ describe("splitEven — active/inactive divisor", () => {
   });
 
   it("single active member (the admin) owes the whole total", () => {
-    const r = splitEven(12345, house({ 1: { active: false }, 2: { active: false }, 3: { active: false }, 4: { active: false }, 5: { active: false } }));
+    const r = splitEven(
+      12345,
+      house({
+        1: { active: false },
+        2: { active: false },
+        3: { active: false },
+        4: { active: false },
+        5: { active: false },
+      }),
+    );
     expect(r.activeCount).toBe(1);
     expect(r.shares).toHaveLength(1);
     expect(r.shares[0].amountCents).toBe(12345);
@@ -124,7 +136,19 @@ describe("splitEven — remainder holder fallback", () => {
 
 describe("splitEven — input validation", () => {
   it("throws on zero active members", () => {
-    expect(() => splitEven(100, house({ 0: { active: false }, 1: { active: false }, 2: { active: false }, 3: { active: false }, 4: { active: false }, 5: { active: false } }))).toThrow(/zero active/);
+    expect(() =>
+      splitEven(
+        100,
+        house({
+          0: { active: false },
+          1: { active: false },
+          2: { active: false },
+          3: { active: false },
+          4: { active: false },
+          5: { active: false },
+        }),
+      ),
+    ).toThrow(/zero active/);
   });
 
   it("throws on an empty member list", () => {
@@ -138,39 +162,72 @@ describe("splitEven — input validation", () => {
   it("throws on non-integer total (float cents)", () => {
     expect(() => splitEven(100.5, house())).toThrow(/integer/);
   });
+
+  it("throws when more than one active member is flagged admin", () => {
+    const twoAdmins = house({ 1: { isAdmin: true } }); // cole + jake both admins
+    expect(() => splitEven(103, twoAdmins)).toThrow(/at most one active admin/);
+  });
 });
 
 describe("splitEven — exhaustive reconciliation sweep", () => {
-  it("shares always sum exactly to the total, are non-negative, and only the admin varies", () => {
-    for (let activeCount = 1; activeCount <= 6; activeCount++) {
-      const members = house().slice(0, activeCount);
-      for (let total = 0; total <= 3000; total++) {
-        const r = splitEven(total, members);
+  // Three member arrangements so the sweep exercises every remainder-holder branch
+  // across the FULL total range (not just at a single remainder value):
+  //   - adminFirst:  admin at active-index 0 (the normal case)
+  //   - adminMid:    admin at a non-zero active-index (findIndex must locate it)
+  //   - noAdmin:     no active admin -> fallback assigns remainder to first active
+  const arrangements = {
+    adminFirst: (n: number) => house().slice(0, n),
+    adminMid: (n: number) =>
+      // Put the admin at the last active index; only meaningful for n >= 2.
+      house({ 0: { isAdmin: false }, [n - 1]: { isAdmin: true } }).slice(0, n),
+    noAdmin: (n: number) => house({ 0: { isAdmin: false } }).slice(0, n),
+  };
 
-        // 1. Exact reconciliation — the invariant that matters most.
-        expect(sum(r.shares)).toBe(total);
+  for (const [name, build] of Object.entries(arrangements)) {
+    it(`[${name}] shares sum exactly to the total, are non-negative, and the remainder holder is correct`, () => {
+      for (let activeCount = 1; activeCount <= 6; activeCount++) {
+        const members = build(activeCount);
+        for (let total = 0; total <= 3000; total++) {
+          const r = splitEven(total, members);
 
-        // 2. Correct count and non-negativity.
-        expect(r.shares).toHaveLength(activeCount);
-        expect(r.shares.every((s) => s.amountCents >= 0)).toBe(true);
+          // 1. Exact reconciliation — the invariant that matters most.
+          expect(sum(r.shares)).toBe(total);
 
-        // 3. Every non-admin pays exactly the base; the admin pays base+remainder.
-        const base = r.perPersonCents;
-        for (const s of r.shares) {
-          expect(s.amountCents).toBe(base + (s.isAdmin ? r.remainderCents : 0));
+          // 2. Correct count and non-negativity.
+          expect(r.shares).toHaveLength(activeCount);
+          expect(r.shares.every((s) => s.amountCents >= 0)).toBe(true);
+
+          // 3. Remainder is in [0, activeCount).
+          expect(r.remainderCents).toBeGreaterThanOrEqual(0);
+          expect(r.remainderCents).toBeLessThan(activeCount);
+
+          // 4. When there's no remainder everyone pays the base; when there is,
+          //    exactly one member absorbs it — and it's the admin (or, in the
+          //    no-admin fallback, the first active member).
+          const base = r.perPersonCents;
+          if (r.remainderCents === 0) {
+            expect(r.shares.every((s) => s.amountCents === base)).toBe(true);
+          } else {
+            const holders = r.shares.filter((s) => s.amountCents === base + r.remainderCents);
+            const others = r.shares.filter((s) => s.amountCents === base);
+            expect(holders).toHaveLength(1);
+            expect(others).toHaveLength(activeCount - 1);
+
+            const admin = r.shares.find((s) => s.isAdmin);
+            const expectedHolder = admin ? admin.memberId : r.shares[0].memberId;
+            expect(holders[0].memberId).toBe(expectedHolder);
+          }
         }
-
-        // 4. Remainder is strictly less than the divisor.
-        expect(r.remainderCents).toBeGreaterThanOrEqual(0);
-        expect(r.remainderCents).toBeLessThan(activeCount);
       }
-    }
-  });
+    });
+  }
 });
 
 describe("sumBillCents", () => {
   it("sums integer-cent bill amounts", () => {
-    expect(sumBillCents([{ amountCents: 70000 }, { amountCents: 2500 }, { amountCents: 6200 }])).toBe(78700);
+    expect(
+      sumBillCents([{ amountCents: 70000 }, { amountCents: 2500 }, { amountCents: 6200 }]),
+    ).toBe(78700);
   });
   it("returns 0 for no bills", () => {
     expect(sumBillCents([])).toBe(0);

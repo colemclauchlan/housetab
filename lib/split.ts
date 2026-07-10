@@ -57,6 +57,14 @@ export function splitEven(totalCents: number, members: SplitMember[]): SplitResu
     throw new Error("cannot split among zero active members");
   }
 
+  // The contract is exactly one admin (who absorbs the remainder). Zero active
+  // admins is tolerated via a documented fallback below; more than one is a data
+  // integrity bug we surface loudly rather than silently mis-attributing cents.
+  const adminCount = active.filter((m) => m.isAdmin).length;
+  if (adminCount > 1) {
+    throw new Error(`expected at most one active admin, got ${adminCount}`);
+  }
+
   const perPersonCents = Math.floor(totalCents / activeCount);
   // remainder is in [0, activeCount - 1]; equal to totalCents % activeCount.
   const remainderCents = totalCents - perPersonCents * activeCount;
