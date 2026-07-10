@@ -99,6 +99,12 @@ export default async function Home({
         </div>
         <div className="flex items-center gap-4">
           <Link
+            href="/history"
+            className="text-sm underline underline-offset-4 opacity-70 hover:opacity-100"
+          >
+            History
+          </Link>
+          <Link
             href="/settings"
             className="text-sm underline underline-offset-4 opacity-70 hover:opacity-100"
           >
