@@ -39,6 +39,7 @@ export interface TgChatMemberUpdated {
 
 export interface TgMessageReaction {
   chat?: TgChat;
+  message_id?: number;
   user?: TgUser;
   new_reaction?: { type: string; emoji?: string }[];
 }
