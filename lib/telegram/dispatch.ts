@@ -2,11 +2,14 @@ import type { TgUpdate } from "@/lib/telegram/updates";
 import { maybeCaptureGroup } from "@/lib/telegram/capture";
 import { handleLinkCallback, parseLinkData } from "@/lib/telegram/linking";
 import { createServiceLinkDeps } from "@/lib/telegram/link-deps";
+import { PAID_CALLBACK } from "@/lib/telegram/announce";
+import { handlePaidCallback } from "@/lib/telegram/paid";
+import { createServicePaidDeps } from "@/lib/telegram/paid-deps";
 
 /**
- * Handle a fresh in-group update. Group capture (M2.2) runs first, then member
- * linking (M2.3). Paid-button taps and reply/reaction fallbacks register here
- * from M3 onward. Every update is also logged to `events` by the webhook.
+ * Handle a fresh in-group update: group capture (M2.2) → member linking (M2.3) →
+ * "I've paid" button taps (M3.1). Reply/reaction fallbacks register here from M4.
+ * Every update is also logged to `events` by the webhook.
  */
 export async function dispatchUpdate(update: TgUpdate): Promise<void> {
   if (await maybeCaptureGroup(update)) return;
@@ -16,6 +19,10 @@ export async function dispatchUpdate(update: TgUpdate): Promise<void> {
     await handleLinkCallback(cbq, createServiceLinkDeps());
     return;
   }
+  if (cbq && cbq.data === PAID_CALLBACK) {
+    await handlePaidCallback(cbq, createServicePaidDeps());
+    return;
+  }
 
-  // TODO(M3): paid-button taps, reply/reaction fallbacks.
+  // TODO(M4): reply/reaction fallbacks.
 }
