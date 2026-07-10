@@ -15,6 +15,7 @@ import {
   markSharePaid,
   postLinkingMessage,
   reannounce,
+  remindUnpaid,
   removeBillType,
   renameMember,
   renamePeriod,
@@ -244,9 +245,18 @@ export default async function Home({
 
         {current && preview ? (
           <div className="flex flex-col gap-1">
-            <h3 className="text-sm font-medium opacity-80">
-              Paid checklist · {paidCount}/{preview.activeCount} paid
-            </h3>
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-medium opacity-80">
+                Paid checklist · {paidCount}/{preview.activeCount} paid
+              </h3>
+              {current.period.status !== "open" && paidCount < preview.activeCount ? (
+                <form action={remindUnpaid}>
+                  <button type="submit" className={secondaryBtn}>
+                    ⏰ Remind unpaid
+                  </button>
+                </form>
+              ) : null}
+            </div>
             <ul className="flex flex-col divide-y divide-black/5 dark:divide-white/5">
               {preview.shares.map((s) => {
                 const member = memberById.get(s.memberId);

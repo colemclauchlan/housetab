@@ -18,6 +18,7 @@ import { splitEven } from "@/lib/split";
 import { sendMessage } from "@/lib/telegram/api";
 import { buildLinkingMessage } from "@/lib/telegram/linking";
 import { buildAnnouncement } from "@/lib/telegram/announce";
+import { buildReminderMessage } from "@/lib/telegram/reminder";
 import { refreshAnnouncement } from "@/lib/telegram/refresh";
 
 /** Best-effort: reflect a status change in the group chat; never block the admin. */
@@ -330,6 +331,40 @@ export async function announce() {
 
   revalidatePath("/");
   redirect(`/?ok=${encodeURIComponent("Announced to the group.")}`);
+}
+
+export async function remindUnpaid() {
+  const cfg = await getBotConfig();
+  if (!cfg.token) backWithError("Set the bot token in Settings first.");
+  if (cfg.groupChatId == null || !cfg.groupConfirmed) {
+    backWithError("Confirm the house group in Settings first.");
+  }
+
+  const current = await getCurrentPeriod();
+  if (!current || current.period.status === "open") {
+    backWithError("Announce the period before sending reminders.");
+  }
+
+  const members = (await getMembers()).filter((m) => m.active);
+  const shares = await getPeriodShares(current.period.id);
+  const unpaid = members
+    .filter((m) => shares.get(m.id)?.status !== "paid")
+    .map((m) => ({
+      name: m.name,
+      telegramUserId: m.telegram_user_id,
+      amountCents: shares.get(m.id)?.amount_cents ?? 0,
+    }));
+
+  if (unpaid.length === 0) backWithError("Everyone's paid — nothing to remind! 🎉");
+
+  const msg = buildReminderMessage(unpaid);
+  try {
+    await sendMessage(cfg.token, cfg.groupChatId, msg.text, { parse_mode: msg.parse_mode });
+  } catch (e) {
+    backWithError(e instanceof Error ? e.message : "Failed to send the reminder.");
+  }
+
+  redirect(`/?ok=${encodeURIComponent(`Reminded ${unpaid.length} unpaid member(s).`)}`);
 }
 
 export async function reannounce() {
