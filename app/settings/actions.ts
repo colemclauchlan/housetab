@@ -8,6 +8,7 @@ import {
   ensureWebhookSecret,
   getBotConfig,
   setBotToken,
+  setRemindersEnabled,
 } from "@/lib/data/bot";
 import { setWebhook } from "@/lib/telegram/api";
 
@@ -59,4 +60,11 @@ export async function clearGroup() {
   await clearGroupChat();
   revalidatePath("/settings");
   back("Group cleared.", true);
+}
+
+export async function toggleReminders(formData: FormData) {
+  const enabled = String(formData.get("enabled") ?? "") === "true";
+  await setRemindersEnabled(enabled);
+  revalidatePath("/settings");
+  back(enabled ? "Auto-reminders on." : "Auto-reminders off.", true);
 }

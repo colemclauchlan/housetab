@@ -106,6 +106,7 @@ export type Database = {
       periods: {
         Row: {
           announce_message_id: number | null;
+          announced_at: string | null;
           created_at: string;
           end_date: string;
           id: string;
@@ -115,6 +116,7 @@ export type Database = {
         };
         Insert: {
           announce_message_id?: number | null;
+          announced_at?: string | null;
           created_at?: string;
           end_date: string;
           id?: string;
@@ -124,6 +126,7 @@ export type Database = {
         };
         Update: {
           announce_message_id?: number | null;
+          announced_at?: string | null;
           created_at?: string;
           end_date?: string;
           id?: string;

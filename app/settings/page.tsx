@@ -1,7 +1,13 @@
 import Link from "next/link";
-import { getBotConfig } from "@/lib/data/bot";
+import { getBotConfig, getRemindersEnabled } from "@/lib/data/bot";
 import { getMe, getWebhookInfo, type BotInfo, type WebhookInfo } from "@/lib/telegram/api";
-import { clearGroup, confirmGroup, registerWebhook, saveBotToken } from "./actions";
+import {
+  clearGroup,
+  confirmGroup,
+  registerWebhook,
+  saveBotToken,
+  toggleReminders,
+} from "./actions";
 
 export const metadata = { title: "Settings · HouseTab" };
 
@@ -19,6 +25,7 @@ export default async function SettingsPage({
 }) {
   const { ok, error } = await searchParams;
   const cfg = await getBotConfig();
+  const remindersEnabled = await getRemindersEnabled();
 
   let bot: BotInfo | null = null;
   let webhook: WebhookInfo | null = null;
@@ -150,6 +157,25 @@ export default async function SettingsPage({
             appears here to confirm.
           </p>
         )}
+      </section>
+
+      {/* ── Auto-reminders ────────────────────────────────────────── */}
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-medium">4 · Auto-reminders</h2>
+        <p className="text-sm opacity-70">
+          A daily job nudges unpaid members 3 & 7 days after announcing, then every 3 days.
+        </p>
+        <div className="flex items-center gap-3 text-sm">
+          <span>
+            Status: <span className="opacity-80">{remindersEnabled ? "on" : "off"}</span>
+          </span>
+          <form action={toggleReminders}>
+            <input type="hidden" name="enabled" value={remindersEnabled ? "false" : "true"} />
+            <button type="submit" className={secondaryBtn}>
+              {remindersEnabled ? "Turn off" : "Turn on"}
+            </button>
+          </form>
+        </div>
       </section>
     </main>
   );

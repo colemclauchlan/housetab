@@ -326,7 +326,11 @@ export async function announce() {
 
   await supabase
     .from("periods")
-    .update({ status: "announced", announce_message_id: sent.message_id })
+    .update({
+      status: "announced",
+      announce_message_id: sent.message_id,
+      announced_at: new Date().toISOString(),
+    })
     .eq("id", current.period.id);
 
   revalidatePath("/");

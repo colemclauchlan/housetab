@@ -89,6 +89,24 @@ export async function clearGroupChat(): Promise<void> {
   await writeSetting("group_confirmed", false);
 }
 
+export async function getRemindersEnabled(): Promise<boolean> {
+  const map = await readSettings(["reminders"]);
+  const v = map.get("reminders");
+  if (v && typeof v === "object" && !Array.isArray(v)) {
+    return (v as Record<string, unknown>).enabled !== false;
+  }
+  return true;
+}
+
+export async function setRemindersEnabled(enabled: boolean): Promise<void> {
+  const map = await readSettings(["reminders"]);
+  const current =
+    map.get("reminders") && typeof map.get("reminders") === "object"
+      ? (map.get("reminders") as Record<string, unknown>)
+      : {};
+  await writeSetting("reminders", { ...current, enabled } as unknown as Json);
+}
+
 /** 32 random bytes as hex — valid Telegram `secret_token` ([A-Za-z0-9_-], ≤256). */
 export function generateWebhookSecret(): string {
   const bytes = new Uint8Array(32);
