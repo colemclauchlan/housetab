@@ -7,9 +7,13 @@ import { parseDollarsToCents } from "@/lib/money";
 import {
   ensureCurrentPeriod,
   getBillWithPeriod,
+  getMembers,
   getSettings,
   setBillTypes,
 } from "@/lib/data/dashboard";
+import { getBotConfig } from "@/lib/data/bot";
+import { sendMessage } from "@/lib/telegram/api";
+import { buildLinkingMessage } from "@/lib/telegram/linking";
 
 function backWithError(message: string): never {
   redirect(`/?error=${encodeURIComponent(message)}`);
@@ -233,6 +237,29 @@ export async function deleteMember(formData: FormData) {
 
   revalidatePath("/");
   redirect("/");
+}
+
+export async function postLinkingMessage() {
+  const cfg = await getBotConfig();
+  if (!cfg.token) backWithError("Set the bot token in Settings first.");
+  if (cfg.groupChatId == null || !cfg.groupConfirmed) {
+    backWithError("Confirm the house group in Settings first.");
+  }
+
+  const active = (await getMembers()).filter((m) => m.active);
+  if (active.length === 0) backWithError("Add members before posting the linking message.");
+
+  const { text, reply_markup } = buildLinkingMessage(
+    active.map((m) => ({ id: m.id, name: m.name })),
+  );
+  try {
+    await sendMessage(cfg.token, cfg.groupChatId, text, { reply_markup });
+  } catch (e) {
+    backWithError(e instanceof Error ? e.message : "Failed to post the linking message.");
+  }
+
+  revalidatePath("/");
+  redirect(`/?ok=${encodeURIComponent("Linking message posted to the group.")}`);
 }
 
 export async function addBillType(formData: FormData) {

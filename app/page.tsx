@@ -12,6 +12,7 @@ import {
   deleteBill,
   deleteMember,
   markSharePaid,
+  postLinkingMessage,
   removeBillType,
   renameMember,
   renamePeriod,
@@ -42,9 +43,9 @@ const secondaryBtn =
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; ok?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, ok } = await searchParams;
 
   const supabase = await createClient();
   const {
@@ -102,6 +103,11 @@ export default async function Home({
         </div>
       </header>
 
+      {ok ? (
+        <p className="rounded border border-green-500/40 bg-green-500/10 px-3 py-2 text-sm text-green-700 dark:text-green-300">
+          {ok}
+        </p>
+      ) : null}
       {error ? (
         <p
           role="alert"
@@ -310,7 +316,14 @@ export default async function Home({
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="text-lg font-medium">Members ({activeMembers.length} active)</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-medium">Members ({activeMembers.length} active)</h2>
+          <form action={postLinkingMessage}>
+            <button type="submit" className={secondaryBtn}>
+              Post name buttons to group
+            </button>
+          </form>
+        </div>
         {members.length > 0 ? (
           <ul className="flex flex-col divide-y divide-black/10 dark:divide-white/10">
             {members.map((m) => (
