@@ -1,0 +1,8 @@
+# pnpm 10+ reads the build-script allowlist here (no longer from the "pnpm" field
+# in package.json). These packages ship native binaries and need their install
+# scripts to run: esbuild (vitest), sharp (Next image opt), unrs-resolver
+# (eslint-config-next import resolution).
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true

@@ -1,0 +1,13 @@
+# Normalize line endings: store LF in the repo, check out LF everywhere so the
+# Linux CI runner and Windows dev machine agree (and Prettier's default LF check
+# stays green regardless of platform).
+* text=auto eol=lf
+
+# Binary assets — never touch line endings.
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.woff binary
+*.woff2 binary

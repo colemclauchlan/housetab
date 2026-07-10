@@ -1,0 +1,13 @@
+node_modules
+.next
+out
+build
+coverage
+pnpm-lock.yaml
+next-env.d.ts
+*.tsbuildinfo
+
+# Prose/docs are hand-formatted (careful line wrapping, nested task lists) — keep
+# Prettier away from them so it doesn't reflow the PRD/plan/README.
+*.md
+docs/
