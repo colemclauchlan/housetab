@@ -4,6 +4,18 @@ import type { Database } from "@/lib/database.types";
 
 type Bill = Database["public"]["Tables"]["bills"]["Row"];
 type Period = Database["public"]["Tables"]["periods"]["Row"];
+type Member = Database["public"]["Tables"]["members"]["Row"];
+
+/** All members, admin first then by creation order. */
+export async function getMembers(): Promise<Member[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("members")
+    .select("*")
+    .order("is_admin", { ascending: false })
+    .order("created_at", { ascending: true });
+  return data ?? [];
+}
 
 export const DEFAULT_BILL_TYPES = ["Rent", "Hydro", "Electricity", "Gas", "Internet"];
 export const DEFAULT_ANCHOR_DAY = 15;

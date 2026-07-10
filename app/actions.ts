@@ -105,6 +105,93 @@ export async function renamePeriod(formData: FormData) {
   redirect("/");
 }
 
+// ─── Members ─────────────────────────────────────────────────────────────────
+
+export async function addMember(formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim();
+  const isAdmin = formData.get("is_admin") === "on";
+  if (!name) backWithError("Enter a member name.");
+
+  const supabase = await createClient();
+  // Exactly one admin: demote any current admin before promoting a new one.
+  if (isAdmin) {
+    await supabase.from("members").update({ is_admin: false }).eq("is_admin", true);
+  }
+  const { error } = await supabase.from("members").insert({ name, is_admin: isAdmin });
+  if (error) backWithError(error.message);
+
+  revalidatePath("/");
+  redirect("/");
+}
+
+export async function renameMember(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "").trim();
+  if (!id) backWithError("Missing member id.");
+  if (!name) backWithError("Member name can’t be empty.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("members").update({ name }).eq("id", id);
+  if (error) backWithError(error.message);
+
+  revalidatePath("/");
+  redirect("/");
+}
+
+export async function setMemberActive(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  const active = String(formData.get("active") ?? "") === "true";
+  if (!id) backWithError("Missing member id.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("members").update({ active }).eq("id", id);
+  if (error) backWithError(error.message);
+
+  revalidatePath("/");
+  redirect("/");
+}
+
+export async function setMemberAdmin(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) backWithError("Missing member id.");
+
+  const supabase = await createClient();
+  // Single admin: demote the current admin, then promote this member.
+  await supabase.from("members").update({ is_admin: false }).eq("is_admin", true);
+  const { error } = await supabase
+    .from("members")
+    .update({ is_admin: true, active: true })
+    .eq("id", id);
+  if (error) backWithError(error.message);
+
+  revalidatePath("/");
+  redirect("/");
+}
+
+export async function unlinkMember(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) backWithError("Missing member id.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("members").update({ telegram_user_id: null }).eq("id", id);
+  if (error) backWithError(error.message);
+
+  revalidatePath("/");
+  redirect("/");
+}
+
+export async function deleteMember(formData: FormData) {
+  const id = String(formData.get("id") ?? "");
+  if (!id) backWithError("Missing member id.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("members").delete().eq("id", id);
+  if (error) backWithError(error.message);
+
+  revalidatePath("/");
+  redirect("/");
+}
+
 export async function addBillType(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) backWithError("Enter a bill-type name.");

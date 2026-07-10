@@ -1,13 +1,20 @@
 import { createClient } from "@/lib/supabase/server";
 import { formatCents } from "@/lib/money";
-import { getCurrentPeriod, getSettings } from "@/lib/data/dashboard";
+import { splitEven } from "@/lib/split";
+import { getCurrentPeriod, getMembers, getSettings } from "@/lib/data/dashboard";
 import { logout } from "./login/actions";
 import {
   addBill,
   addBillType,
+  addMember,
   deleteBill,
+  deleteMember,
   removeBillType,
+  renameMember,
   renamePeriod,
+  setMemberActive,
+  setMemberAdmin,
+  unlinkMember,
   updateBill,
 } from "./actions";
 
@@ -30,11 +37,27 @@ export default async function Home({
     data: { user },
   } = await supabase.auth.getUser();
 
-  const [{ billTypes, anchorDay }, current] = await Promise.all([
+  const [{ billTypes, anchorDay }, current, members] = await Promise.all([
     getSettings(),
     getCurrentPeriod(),
+    getMembers(),
   ]);
   const typeOptions = [...billTypes, "Other"];
+  const activeMembers = members.filter((m) => m.active);
+
+  // Live per-person preview of the current period's even split (frozen at Announce, M2.4).
+  let preview: ReturnType<typeof splitEven> | null = null;
+  let previewError: string | null = null;
+  if (current && activeMembers.length > 0) {
+    try {
+      preview = splitEven(
+        current.totalCents,
+        activeMembers.map((m) => ({ id: m.id, isAdmin: m.is_admin, active: true })),
+      );
+    } catch (e) {
+      previewError = e instanceof Error ? e.message : "cannot compute split";
+    }
+  }
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-8 p-6">
@@ -154,6 +177,27 @@ export default async function Home({
             <span className="font-mono text-lg">{formatCents(current.totalCents)}</span>
           </div>
         ) : null}
+
+        {current && preview ? (
+          <div className="flex items-center justify-between text-sm">
+            <span className="opacity-70">Each owes ({preview.activeCount}-way split)</span>
+            <span className="font-mono">
+              {formatCents(preview.perPersonCents)}
+              {preview.remainderCents > 0 ? (
+                <span className="opacity-60">
+                  {" "}
+                  · admin {formatCents(preview.perPersonCents + preview.remainderCents)}
+                </span>
+              ) : null}
+            </span>
+          </div>
+        ) : null}
+        {current && activeMembers.length === 0 ? (
+          <p className="text-xs opacity-60">Add members below to see each person’s share.</p>
+        ) : null}
+        {current && previewError ? (
+          <p className="text-xs text-red-600 dark:text-red-400">Can’t split: {previewError}</p>
+        ) : null}
       </section>
 
       <section className="flex flex-col gap-3">
@@ -197,6 +241,91 @@ export default async function Home({
       </section>
 
       <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-medium">Members ({activeMembers.length} active)</h2>
+        {members.length > 0 ? (
+          <ul className="flex flex-col divide-y divide-black/10 dark:divide-white/10">
+            {members.map((m) => (
+              <li
+                key={m.id}
+                className={`flex flex-wrap items-center gap-2 py-2 ${m.active ? "" : "opacity-50"}`}
+              >
+                <form action={renameMember} className="flex items-center gap-1">
+                  <input type="hidden" name="id" value={m.id} />
+                  <input name="name" defaultValue={m.name} className={`${inputCls} w-32`} />
+                  <button
+                    type="submit"
+                    className="text-xs underline underline-offset-2 opacity-50 hover:opacity-100"
+                  >
+                    Save
+                  </button>
+                </form>
+
+                {m.is_admin ? (
+                  <span className="rounded-full border border-black/15 px-2 py-0.5 text-xs opacity-70 dark:border-white/20">
+                    admin
+                  </span>
+                ) : (
+                  <form action={setMemberAdmin}>
+                    <input type="hidden" name="id" value={m.id} />
+                    <button
+                      type="submit"
+                      className="text-xs underline underline-offset-2 opacity-50 hover:opacity-100"
+                    >
+                      Make admin
+                    </button>
+                  </form>
+                )}
+
+                <span className="text-xs opacity-60">
+                  {m.telegram_user_id ? "🔗 linked" : "not linked"}
+                </span>
+                {m.telegram_user_id ? (
+                  <form action={unlinkMember}>
+                    <input type="hidden" name="id" value={m.id} />
+                    <button
+                      type="submit"
+                      className="text-xs underline underline-offset-2 opacity-50 hover:opacity-100"
+                    >
+                      Unlink
+                    </button>
+                  </form>
+                ) : null}
+
+                <form action={setMemberActive} className="ml-auto">
+                  <input type="hidden" name="id" value={m.id} />
+                  <input type="hidden" name="active" value={m.active ? "false" : "true"} />
+                  <button type="submit" className={secondaryBtn}>
+                    {m.active ? "Deactivate" : "Activate"}
+                  </button>
+                </form>
+                <form action={deleteMember}>
+                  <input type="hidden" name="id" value={m.id} />
+                  <button type="submit" className={secondaryBtn}>
+                    Delete
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm opacity-60">No members yet. Add the household below.</p>
+        )}
+
+        <form id="add-member-form" action={addMember} className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-1 text-xs opacity-70">
+            Name
+            <input name="name" required placeholder="e.g. Jake" className={inputCls} />
+          </label>
+          <label className="flex items-center gap-1 text-xs opacity-70">
+            <input type="checkbox" name="is_admin" /> admin
+          </label>
+          <button type="submit" className={secondaryBtn}>
+            Add member
+          </button>
+        </form>
+      </section>
+
+      <section className="flex flex-col gap-3">
         <h2 className="text-lg font-medium">Bill types</h2>
         <div className="flex flex-wrap gap-2">
           {billTypes.map((t) => (
@@ -229,8 +358,7 @@ export default async function Home({
       </section>
 
       <footer className="text-xs opacity-40">
-        Even split among active members and the paid checklist land in M1.3–M1.4. Anchor day:{" "}
-        {anchorDay}.
+        The paid checklist and Telegram announce land in M1.4 / M2. Anchor day: {anchorDay}.
       </footer>
     </main>
   );
