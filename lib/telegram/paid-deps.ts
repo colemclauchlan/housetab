@@ -2,6 +2,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { getBotTokenService } from "@/lib/telegram/token";
 import { answerCallbackQuery } from "@/lib/telegram/api";
 import { refreshAnnouncement } from "@/lib/telegram/refresh";
+import { maybeCloseIfSettled } from "@/lib/telegram/settle";
 import type { PaidDeps } from "@/lib/telegram/paid";
 
 /** Production PaidDeps backed by the Supabase service client + Bot API. */
@@ -58,8 +59,9 @@ export function createServicePaidDeps(): PaidDeps {
     },
 
     async onPaid(periodId) {
-      // Live grid refresh (FR-11) — best-effort; never fail the webhook over it.
-      await refreshAnnouncement(periodId);
+      // Best-effort; never fail the webhook over these.
+      await refreshAnnouncement(periodId); // live grid (FR-11)
+      await maybeCloseIfSettled(periodId); // 🎉 all-settled + close (FR-19)
     },
   };
 }

@@ -20,6 +20,7 @@ import { buildLinkingMessage } from "@/lib/telegram/linking";
 import { buildAnnouncement } from "@/lib/telegram/announce";
 import { buildReminderMessage } from "@/lib/telegram/reminder";
 import { refreshAnnouncement } from "@/lib/telegram/refresh";
+import { maybeCloseIfSettled } from "@/lib/telegram/settle";
 
 /** Best-effort: reflect a status change in the group chat; never block the admin. */
 async function refreshChat(periodId: string, banner?: string): Promise<void> {
@@ -27,6 +28,15 @@ async function refreshChat(periodId: string, banner?: string): Promise<void> {
     await refreshAnnouncement(periodId, banner);
   } catch {
     // ignore — the dashboard is the source of truth; the chat is a mirror
+  }
+}
+
+/** Best-effort: if everyone's now paid, post 🎉 and close the period (FR-19). */
+async function settleIfDone(periodId: string): Promise<void> {
+  try {
+    await maybeCloseIfSettled(periodId);
+  } catch {
+    // ignore
   }
 }
 
@@ -147,6 +157,7 @@ export async function markSharePaid(formData: FormData) {
   if (error) backWithError(error.message);
 
   await refreshChat(periodId);
+  await settleIfDone(periodId);
   revalidatePath("/");
   redirect("/");
 }
