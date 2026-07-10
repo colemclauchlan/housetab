@@ -26,3 +26,5 @@ Thumbs.db
 *.log
 coverage/
 .turbo/
+
+# local tooling / editor config (machine-specific)
