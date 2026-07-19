@@ -8,8 +8,12 @@ themselves paid with a one-tap **"✅ I've sent my e-transfer"** button; the mes
 with ⬜/✅ next to each name, and the dashboard shows who still owes. It never moves money — it
 only tracks declarations of payment.
 
-- [PRD](docs/PRD.md) · [Execution plan](docs/EXECUTION_PLAN.md) · [Build notes](docs/NOTES.md)
 - Cost: **$0–$10/month** (Vercel Hobby + Supabase + free Telegram Bot API).
+- [Acceptance checklist](docs/ACCEPTANCE.md)
+
+**Why Telegram-first?** The house group chat already lives there. Bills arrive as a formatted
+message with one-tap paid buttons — nobody installs an app, and the admin dashboard stays a
+private, no-signup surface for the one person who actually pays the landlord.
 
 ## Stack
 
